@@ -2,35 +2,216 @@
 
 
 // Crie um aplicativo Express const app = express ();
+USER_NAME"AvivoImoveis ia"
+GIT_USER_EMAIL="avivoimoveis@gmail.com"
 
+echo "Criando arquivos do projeto (app.js, package.json, .gitignore, .env.example, README.md)..."
 
-// Middleware para analisar corpos JSON 
-app . use ( express . json ());
+# --- app.js ---
+cat > app.js <<'EOF'
+// app.js - AVIVO IMOVEIS
+// Servidor Express simples para receber e verificar webhooks (Facebook/WhatsApp, etc.)
+// Instruções: coloque este arquivo na raiz do repositório e defina as variáveis de ambiente
+// VERIFY_TOKEN (token de verificação) e PORT (opcional).
 
-// Definir porta e verify_token const port = process . env . PORT || 3000 ; const verifyToken = process . env . VERIFY_TOKEN ;
- 
+require('dotenv').config(); // opcional: leia variáveis de .env se existir
+const express = require('express');
+const app = express();
 
+// Middleware para parsear JSON
+app.use(express.json());
 
-// Rota para solicitações GET 
-app . get ( '/' , ( req , res ) => { const { 'hub.mode' : mode , 'hub.challenge' : challenge , 'hub.verify_token' : token } = req . query ;   
-       
+// Porta e token de verificação
+const port = process.env.PORT || 3000;
+const verifyToken = process.env.VERIFY_TOKEN || 'troque_este_token_em_producao';
 
-  se ( modo === 'inscrever-se' && token === verifyToken ) { 
-    console . log ( 'WEBHOOK VERIFICADO' ); 
-    res . status ( 200 ). enviar ( desafio ); } senão { 
-    res . status ( 403 ). fim (); } });    
-    
-  
+// Rota GET para verificação do webhook
+// Plataformas como Facebook/WhatsApp fazem uma requisição GET com query params:
+// hub.mode, hub.challenge, hub.verify_token
+app.get('/', (req, res) => {
+  const mode = req.query['hub.mode'];
+  const challenge = req.query['hub.challenge'];
+  const token = req.query['hub.verify_token'];
 
+  // Apenas responda com o challenge quando o mode for 'subscribe' e o token bater
+  if (mode === 'subscribe' && token === verifyToken) {
+    console.log('WEBHOOK VERIFICADO');
+    return res.status(200).send(challenge);
+  }
 
-// Rota para solicitações POST 
-app . post ( '/' , ( req , res ) => { const timestamp = new Date (). toISOString (). replace ( 'T' , ' ' ). slice ( 0 , 19 ); 
-  console . log (` \n\n Webhook recebido $ { timestamp } \n `); 
-  console . log ( JSON . stringify ( req . body , null , 2 )); 
-  res . status ( 200 ). end (); });   
-        
+  // Caso contrário, recuse
+  return res.sendStatus(403);
+});
 
+// Rota POST para receber eventos do webhook
+app.post('/', (req, res) => {
+  const timestamp = new Date().toISOString().replace('T', ' ').slice(0, 19);
+  console.log(`\n\nWebhook recebido ${timestamp}\n`);
+  console.log(JSON.stringify(req.body, null, 2));
 
-// Inicie o aplicativo do servidor . 
-listen ( port , ( ) = > { 
-  console.log (` \n Escutando na porta $ { port } \n` ); });   
+  // TODO: aqui você processa o evento conforme sua integração (enviar para CRM, responder, etc.)
+
+  // Retorne 200 para confirmar recebimento à plataforma
+  res.sendStatus(200);
+});
+
+// Inicia o servidor
+app.listen(port, () => {
+  console.log(`Servidor rodando na porta ${port}`);
+  console.log(`VERIFY_TOKEN usado: ${verifyToken === 'troque_este_token_em_producao' ? '(token padrão - altere em produção)' : '(variável de ambiente definida)'}`);
+});
+EOF
+
+# --- package.json ---
+cat > package.json <<'EOF'
+{
+  "name": "avivoimoveis-webhook",
+  "version": "1.0.0",
+  "description": "Webhook simples em Express para AVIVO IMOVEIS - receber/verificar eventos (Facebook/WhatsApp)",
+  "main": "app.js",
+  "scripts": {
+    "start": "node app.js",
+    "dev": "nodemon app.js"
+  },
+  "keywords": ["webhook","express","avivo","imoveis"],
+  "author": "Alexandre Vivone - AVIVO IMOVEIS",
+  "license": "MIT",
+  "dependencies": {
+    "express": "^4.18.2",
+    "dotenv": "^16.3.1"
+  }
+}
+EOF
+
+# --- .gitignore ---
+cat > .gitignore <<'EOF'
+/node_modules
+/.env
+.DS_Store
+npm-debug.log
+yarn-error.log
+EOF
+
+# --- .env.example ---
+cat > .env.example <<'EOF'
+# TOKEN usado para verificar webhook com a plataforma (ex.: Facebook/WhatsApp)
+VERIFY_TOKEN=troque_este_token_em_producao
+# Porta (opcional - Render normalmente define automaticamente)
+PORT=3000
+EOF
+
+# --- README.md ---
+cat > README.md <<'EOF'
+# AVIVO IMOVEIS - Webhook Express
+
+Pequeno servidor Express para receber e verificar webhooks (ex.: Facebook, WhatsApp). Projetado para ser simples, seguro e facilmente deployável no Render ou em qualquer serviço que aceite Node.js.
+
+## Arquivos incluídos
+- `app.js` - servidor Express principal
+- `package.json` - dependências e scripts
+- `.gitignore`
+- `.env.example` - exemplo de variáveis de ambiente
+
+## Como usar localmente
+1. Clone o repositório ou use os arquivos gerados.
+2. Instale dependências:
+
+\`\`\`bash
+npm install
+\`\`\`
+
+3. Crie um arquivo `.env` na raiz (a partir de `.env.example`) e defina `VERIFY_TOKEN`:
+
+\`\`\`
+VERIFY_TOKEN=seu_token_secreto
+PORT=3000
+\`\`\`
+
+4. Inicie o servidor:
+
+\`\`\`bash
+npm start
+\`\`\`
+
+5. Teste a verificação do webhook (GET):
+
+\`\`\`bash
+curl "http://localhost:3000/?hub.mode=subscribe&hub.challenge=teste&hub.verify_token=seu_token_secreto"
+\`\`\`
+
+Deve retornar `teste` se o token estiver correto.
+
+## Deploy no Render
+1. Crie um novo **Web Service** no Render e conecte ao seu repositório GitHub.
+2. Em **Environment**, adicione a variável de ambiente `VERIFY_TOKEN` com o token usado para validar o webhook.
+3. Defina o **Start Command** como:
+
+\`\`\`
+npm start
+\`\`\`
+
+Render gerencia `PORT` automaticamente.
+
+## Integração com Facebook/WhatsApp
+- No painel da plataforma, informe a URL pública de callback (ex.: `https://seu-servico.onrender.com/`) e o `VERIFY_TOKEN` cadastrado.
+- A plataforma fará uma requisição GET com parâmetros `hub.mode`, `hub.challenge` e `hub.verify_token`; o servidor responde com o `hub.challenge` quando o token bater.
+
+## Observações
+- Em produção, altere o token padrão e mantenha o `.env` fora do controle de versão.
+- Se quiser processar e armazenar eventos (ex.: enviar para CRM), edite a rota `POST /` em `app.js`.
+
+## Contato
+Alexandre Vivone — AVIVO IMOVEIS
+EOF
+
+echo "Arquivos criados com sucesso."
+
+# Instalar dependências
+echo "Instalando dependências (express, dotenv)..."
+npm install
+
+# Inicializar Git e commit inicial
+if [ ! -d ".git" ]; then
+  echo "Inicializando repositório Git..."
+  git init
+else
+  echo "Repositório Git já inicializado."
+fi
+
+# Configurar usuário Git (somente se não estiver configurado)
+git config user.name "${GIT_USER_NAME}" || true
+git config user.email "${GIT_USER_EMAIL}" || true
+
+git add .
+git commit -m "Initial commit - webhook AVIVO IMOVEIS" || true
+git branch -M main || true
+
+# Tentar criar/reusar remotes e dar push
+if command -v gh >/dev/null 2>&1; then
+  echo "GitHub CLI detectada. Tentando criar repositório público e dar push..."
+  # Tenta criar repositório público com nome padrao se não existir
+  gh repo create avivoimoveis-webhook --public --source=. --remote=origin --push || {
+    echo "Falha ao criar com gh (talvez o repositório já exista). Tentando push com remote existente..."
+    git push -u origin main || echo "Push falhou. Verifique remotes ou defina GITHUB_URL."
+  }
+elif [ -n "$GITHUB_URL" ]; then
+  echo "Usando GITHUB_URL fornecida. Configurando remote e fazendo push..."
+  git remote add origin "$GITHUB_URL" 2>/dev/null || echo "Remote origin já existe."
+  git push -u origin main || echo "Push falhou. Verifique credenciais e a URL do repositório."
+else
+  echo "Nem 'gh' está disponível nem 'GITHUB_URL' foi definida."
+  echo "Se quiser que eu faça o push automaticamente, instale a GitHub CLI (gh) ou reexecute o script definindo GITHUB_URL."
+fi
+
+# Criar .env local a partir do exemplo (opcional)
+if [ ! -f ".env" ]; then
+  cp .env.example .env
+  echo ".env criado a partir de .env.example (edite VERIFY_TOKEN)."
+else
+  echo ".env já existe — não sobrescrevido."
+fi
+
+echo "Tudo pronto."
+echo "Para rodar localmente: npm start"
+echo "Edite .env e defina VERIFY_TOKEN antes de usar com plataformas externas."
+
